@@ -1,0 +1,16 @@
+{
+    "_comentario": "Cambia aquí la IP del robot: la de tu VM con URSim (aula, 10.172.18.x) o la del UR3e real (laboratorio, 10.172.21.203-206). Los ángulos de desfase van en grados.",
+    "robots": [
+        {
+            "nombre": "ursim",
+            "ip": "10.172.18.100",
+            "puerto_primaria": 30001,
+            "puerto_tiempo_real": 30003,
+            "pose": [0, 0, 0, 0, 0, 0]
+        }
+    ],
+    "convenio_angulos": {
+        "signo": [1, 1, 1, 1, 1, 1],
+        "desfase_grados": [0, 0, 0, 0, 0, 0]
+    }
+}

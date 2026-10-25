@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code (salvo configuraciones de depuración)
+.vscode/*
+!.vscode/launch.json
+
+# El visualizador se instala desde el .whl del aula virtual: no se sube
+*.whl

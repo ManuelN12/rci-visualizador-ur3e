@@ -1,0 +1,23 @@
+{
+    "_comentario": "Para probar en casa con herramientas/robot_falso.py (mismo PC). Los dos robots usan puertos distintos porque están en la misma IP.",
+    "robots": [
+        {
+            "nombre": "falso1",
+            "ip": "127.0.0.1",
+            "puerto_primaria": 30001,
+            "puerto_tiempo_real": 30003,
+            "pose": [0, 0, 0, 0, 0, 0]
+        },
+        {
+            "nombre": "falso2",
+            "ip": "127.0.0.1",
+            "puerto_primaria": 31001,
+            "puerto_tiempo_real": 31003,
+            "pose": [0, 1.0, 0, 0, 0, 3.14159]
+        }
+    ],
+    "convenio_angulos": {
+        "signo": [1, 1, 1, 1, 1, 1],
+        "desfase_grados": [0, 0, 0, 0, 0, 0]
+    }
+}
