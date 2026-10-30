@@ -23,7 +23,7 @@ Tiempo estimado: 1,5–2 h.
 1. VirtualBox, **con la VM apagada**: *Configuración → Red → Adaptador 1 → Adaptador puente*, y en *Nombre* la tarjeta
    **Ethernet cableada** (no Wi‑Fi ni virtual).
 2. Arrancar la VM y, en un terminal de la VM: `ip addr`. Apuntar su IP (debe ser `10.172.18.x`).
-   - IP de mi VM: `10.172.18.____`
+   - IP de mi VM: `10.172.18.178`
 3. Desde el PC (PowerShell):
    ```powershell
    ping 10.172.18.____

@@ -55,7 +55,7 @@ La IP del robot se cambia en `config/robots.json`, **sin tocar el código**:
 ```json
 {
     "robots": [
-        { "nombre": "ursim", "ip": "10.172.18.100", "puerto_primaria": 30001, "puerto_tiempo_real": 30003,
+        { "nombre": "ursim", "ip": "10.172.18.178", "puerto_primaria": 30001, "puerto_tiempo_real": 30003,
           "pose": [0, 0, 0, 0, 0, 0] }
     ],
     "convenio_angulos": { "signo": [1, 1, 1, 1, 1, 1], "desfase_grados": [0, 0, 0, 0, 0, 0] }
@@ -66,6 +66,7 @@ La IP del robot se cambia en `config/robots.json`, **sin tocar el código**:
 - `convenio_angulos`: corrección si alguna articulación del modelo de PyBullet tuviera otro origen o sentido
   (`q_modelo = signo · q_ur + desfase`).
 - Otro fichero: `--config ruta.json`. Otro robot de la lista: `--robot nombre`.
+- Los ficheros JSON pueden estar guardados con BOM (Bloc de notas, PowerShell): `configuracion.py` los lee con `utf-8-sig`.
 
 ## Uso
 

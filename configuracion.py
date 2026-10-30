@@ -54,7 +54,7 @@ class Configuracion:
 
 def cargar(ruta: Optional[str] = None) -> Configuracion:
     ruta = Path(ruta) if ruta else FICHERO_POR_DEFECTO
-    with open(ruta, encoding="utf-8") as f:
+    with open(ruta, encoding="utf-8-sig") as f:   # -sig: admite ficheros guardados con BOM (Bloc de notas, PowerShell)
         datos = json.load(f)
 
     robots = []

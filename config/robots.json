@@ -3,7 +3,7 @@
     "robots": [
         {
             "nombre": "ursim",
-            "ip": "10.172.18.100",
+            "ip": "10.172.18.178",
             "puerto_primaria": 30001,
             "puerto_tiempo_real": 30003,
             "pose": [0, 0, 0, 0, 0, 0]
