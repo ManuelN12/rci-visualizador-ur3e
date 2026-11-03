@@ -13,8 +13,12 @@ el último) del dibujo (como mucho FPS veces por segundo).
   --modo angulos     B3 · los 6 q_actual en grados (10 veces por segundo)
   --modo visor       B4 · mueve el robot de PyBullet (por defecto)
 
-El "retraso" compara el reloj del controlador (campo Time, byte 4) con el del PC: si el
-programa va más lento que el robot, crece sin parar (los datos envejecen en el búfer).
+Cómo saber si el programa se queda atrás:
+  - "recv llenos": cuántas llamadas a recv() devolvieron el máximo que se pide (64 kB). Si es 0,
+    el sistema operativo no tenía datos acumulados: el programa va al día. Si crece, hay cola.
+  - "retraso": compara el reloj del controlador (campo Time, byte 4) con el del PC. Solo es válido
+    si el reloj del robot avanza a tiempo real (≈ 1 s por s real), como en un robot de verdad.
+    En URSim dentro de una VM el controlador puede ir más lento y entonces se muestra "—".
 """
 from __future__ import annotations
 
@@ -30,6 +34,7 @@ from ur_conexion import ConexionUR
 
 SILENCIO_MAX = 0.5   # s sin datos a 500 Hz (250 paquetes perdidos) -> reconectar
 FPS = 60             # actualizaciones de la ventana por segundo
+TAM_RECV = 65536     # bytes que pide cada recv() (ConexionUR); si llega lleno, había datos esperando
 
 
 class MedidorRetraso:
@@ -92,6 +97,8 @@ def main() -> None:
     paquetes = 0
     longitudes = Counter()
     retraso_actual = 0.0
+    t_robot_inicio = t_robot_ultimo = None   # reloj del controlador al principio y al final de cada intervalo
+    recv_llenos = 0                           # recv() que devolvieron el máximo: había cola en el SO
     try:
         while True:
             mensajes = conexion.leer()
@@ -107,12 +114,17 @@ def main() -> None:
                     if registro:
                         registro.writerow([f"{time.monotonic() - t0:.4f}", n])
 
+            recv_llenos += sum(1 for n in conexion.ultimos_recv if n >= TAM_RECV)
+
             # Recepción: consumir TODOS los paquetes, quedarse con el último
             for paquete in mensajes:
                 paquetes += 1
                 longitudes[len(paquete)] += 1
                 ultimo_q = ur.tiempo_real_q_actual(paquete)
-                retraso_actual = retraso.medir(ur.tiempo_real_tiempo(paquete))
+                t_robot_ultimo = ur.tiempo_real_tiempo(paquete)
+                if t_robot_inicio is None:
+                    t_robot_inicio = t_robot_ultimo
+                retraso_actual = retraso.medir(t_robot_ultimo)
 
             ahora = time.monotonic()
 
@@ -134,10 +146,26 @@ def main() -> None:
                         detalle = ", ".join(f"{n} de {lon} B" for lon, n in sorted(longitudes.items()))
                         print(f"[{time.strftime('%H:%M:%S')}] {paquetes} paquetes: {detalle}")
                     else:
-                        print(f"[{time.strftime('%H:%M:%S')}] {paquetes / transcurrido:6.1f} paquetes/s   "
-                              f"retraso {retraso_actual * 1000:7.1f} ms   "
-                              f"búfer {len(conexion.buffer):5d} B", flush=True)
+                        # Reloj del robot (campo Time): cuánto avanza entre paquetes y respecto al reloj del PC.
+                        # Distingue un simulador que va más lento que el tiempo real de un programa que no da abasto.
+                        ritmo = None
+                        if paquetes > 1 and t_robot_inicio is not None:
+                            avance = t_robot_ultimo - t_robot_inicio
+                            ritmo = avance / transcurrido
+                        if ritmo is not None and 0.95 <= ritmo <= 1.05:
+                            texto_retraso = f"{retraso_actual * 1000:7.1f} ms"
+                        else:
+                            texto_retraso = "      — "   # reloj del robot no va a tiempo real: la medida no vale
+                            retraso.reiniciar()
+                        texto = (f"[{time.strftime('%H:%M:%S')}] {paquetes / transcurrido:6.1f} paquetes/s   "
+                                 f"recv llenos {recv_llenos:3d}   retraso {texto_retraso}")
+                        if args.modo == "frecuencia" and ritmo is not None:
+                            texto += (f"\n           reloj robot: {avance / (paquetes - 1) * 1000:5.2f} ms/paquete, "
+                                      f"{ritmo:4.2f} s por s real")
+                        print(texto, flush=True)
                 paquetes = 0
+                recv_llenos = 0
+                t_robot_inicio = None
                 longitudes.clear()
                 ultimo_informe = ahora
     except KeyboardInterrupt:

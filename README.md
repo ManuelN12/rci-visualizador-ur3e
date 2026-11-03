@@ -11,7 +11,7 @@ los mensajes binarios que emite y reproduce su configuración articular en el si
 
 | Nivel | Requisitos | Estado |
 |---|---|---|
-| Aprobado (5) | `primaria.py` (30001) y `tiempo_real.py` (30003), con búfer y delimitación por longitud | ✅ Probado con el robot falso · ⏳ pendiente de validar con URSim |
+| Aprobado (5) | `primaria.py` (30001) y `tiempo_real.py` (30003), con búfer y delimitación por longitud | ✅ Validado con URSim 5.25.2 (hitos A0–A5, B1–B4 y reinicio de URSim). Resultados en `medidas/` |
 | Notable (7) | Varios robots en la misma ventana, configurados por fichero, uno por hilo | ⏳ |
 | Sobresaliente (10) | Envío de órdenes URScript y mini-aplicación «Enseñar y reproducir» | ⏳ |
 
@@ -80,7 +80,7 @@ Cada hito del enunciado tiene su modo:
 | A4 | `python primaria.py --modo angulos` | Los 6 ángulos coinciden con la pestaña *Mover* de PolyScope |
 | A5 | `python primaria.py` | El robot de PyBullet sigue al de URSim |
 | B1 | `python tiempo_real.py --modo paquetes` | Todos los paquetes tienen la misma longitud |
-| B2 | `python tiempo_real.py --modo frecuencia` | Unos 500 paquetes por segundo y retraso estable |
+| B2 | `python tiempo_real.py --modo frecuencia` | Unos 500 paquetes por segundo (menos si URSim no va a tiempo real) y `recv llenos` = 0 |
 | B3 | `python tiempo_real.py --modo angulos` | Coinciden con los de `primaria.py` |
 | B4 | `python tiempo_real.py` | Tras mover rápido el robot, el simulado no acumula retraso |
 
