@@ -13,7 +13,7 @@ los mensajes binarios que emite y reproduce su configuración articular en el si
 |---|---|---|
 | Aprobado (5) | `primaria.py` (30001) y `tiempo_real.py` (30003), con búfer y delimitación por longitud | ✅ Validado con URSim 5.25.2 (hitos A0–A5, B1–B4 y reinicio de URSim). Resultados en `medidas/` |
 | Notable (7) | Varios robots en la misma ventana, configurados por fichero, uno por hilo | ✅ `varios_robots.py` probado con URSim + robot falso (desconexión de uno sin afectar al otro). Pendiente: repetir con el URSim de un compañero |
-| Sobresaliente (10) | Envío de órdenes URScript y mini-aplicación «Enseñar y reproducir» | ⏳ |
+| Sobresaliente (10) | Envío de órdenes URScript y mini-aplicación «Enseñar y reproducir» | ◐ `ensenar_reproducir.py` probado con el robot falso. Pendiente: URSim y UR3e real con el profesor |
 
 ## Estructura
 
@@ -22,6 +22,8 @@ los mensajes binarios que emite y reproduce su configuración articular en el si
 ├── tiempo_real.py         Bloque B · interfaz de tiempo real (puerto 30003, 500 Hz)
 ├── varios_robots.py       Bloque C · notable: varios robots, un hilo receptor por robot
 ├── receptor.py            Hilo receptor de un robot (último estado protegido con Lock)
+├── ensenar_reproducir.py  Bloque D · sobresaliente: enseñar, previsualizar, ejecutar y supervisar
+├── consola_ur3e.bat       Doble clic: consola con el entorno conda ur3e (PyBullet) en esta carpeta
 ├── ur_protocolo.py        Decodificación: búfer, mensajes, subpaquetes, tiempo real (sin red)
 ├── ur_conexion.py         Conexión TCP: búfer, watchdog de silencio y reconexión automática
 ├── visor.py               Envoltorio del visualizador PyBullet (convenio de ángulos, copias de listas)
@@ -101,6 +103,27 @@ python varios_robots.py --config config/ursim_y_falso.json               # URSim
 
 Cada robot se recibe en su propio hilo. Si uno deja de enviar datos durante más de 1 s, su robot simulado se queda quieto
 y se pinta de rojo, y los demás siguen funcionando. Cada 2 s se muestra una tabla con el estado de todos.
+
+### Enseñar y reproducir (sobresaliente)
+
+Requisitos en PolyScope: robot encendido (ON → START, estado Normal), *Settings → System → Remote Control* habilitado
+y el icono de arriba a la derecha en **Remote**.
+
+```bash
+python ensenar_reproducir.py                       # robot por defecto de config/robots.json
+```
+
+Órdenes (se escriben en la consola): `punto` (guardar la posición actual), `deslizadores` (punto desde PyBullet),
+`lista`, `borrar N`, `vaciar`, `ver` (previsualizar con el robot fantasma azul), `ejecutar`, `pausa`, `seguir`,
+`cancelar`, `guardar NOMBRE`, `cargar NOMBRE`, `estado`, `ayuda`, `salir`.
+
+Cada punto se envía como `movej(q, a=0.5, v=0.3)` por el socket del puerto 30001 y no se envía el siguiente hasta que
+`isProgramRunning` ha pasado a verdadero y luego a falso y `q_actual` está a menos de 0,01 rad del objetivo. Un error del
+robot (tipo 20, subtipos 6 o 10) o una parada de protección detienen la secuencia. Las secuencias se guardan en
+`secuencias/NOMBRE.json` (radianes).
+
+Para probarlo sin URSim: `python herramientas/robot_falso.py --quieto` acepta `movej`, `stopj` y bloques `def … end`,
+y para provocar un error, `falso_parada()` / `falso_rearmar()` (solo en el robot falso).
 
 ### Probar en casa sin URSim
 

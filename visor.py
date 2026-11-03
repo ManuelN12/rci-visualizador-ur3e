@@ -67,6 +67,19 @@ class Visor:
         else:
             self._marcados.discard(robot_id)
 
+    def colorear(self, robot_id: int, rgba: List[float]) -> None:
+        """Pinta todas las piezas de un robot de un color (con transparencia en rgba[3])."""
+        import pybullet as p
+        for d in p.getVisualShapeData(robot_id):
+            p.changeVisualShape(robot_id, d[1], rgbaColor=list(rgba))
+
     def deslizadores(self) -> dict:
         """Valores de los deslizadores de la ventana (claves ' j0' a ' j11')."""
         return self._ur.get_param_values()
+
+    def q_deslizadores(self) -> List[float]:
+        """Los 6 primeros deslizadores (brazo) en radianes, en el convenio del UR."""
+        valores = self.deslizadores()
+        q_modelo = [valores[f" j{i}"] for i in range(6)]
+        # deshacer el convenio: q_ur = (q_modelo - desfase) / signo
+        return [(qm - d) / s for qm, d, s in zip(q_modelo, self.convenio.desfase_rad, self.convenio.signo)]

@@ -9,20 +9,33 @@ Qué envía:
     no documentado que el cliente debe saltar). Cada 15 s, un mensaje de texto (tipo 20, subtipo 0).
   - Puerto tiempo real: a 500 Hz, paquetes de 1220 bytes con q_actual en el byte 252.
 
-El brazo se mueve solo, despacio, alrededor de una postura fácil de reconocer.
+El brazo se mueve solo, despacio, alrededor de una postura fácil de reconocer, hasta que recibe la
+primera orden (o desde el principio está quieto, con --quieto).
 Con --trocear, los bytes se envían en trozos de tamaño aleatorio, como pasaría en una red
 cargada: así se comprueba que el búfer del cliente corta bien los mensajes.
+
+Órdenes (URScript en texto, terminado en \n, por el puerto primaria), para probar el sobresaliente:
+  movej([q0, ..., q5], a=..., v=...)   movimiento articular: isProgramRunning = True mientras se mueve
+  def nombre(): ... end                 varias órdenes movej seguidas (un programa)
+  stopj(a)                              detiene el movimiento
+  falso_parada()                        SOLO PRUEBAS: simula una parada de protección
+  falso_rearmar()                       SOLO PRUEBAS: la quita (como "desbloquear" en PolyScope)
+Un programa nuevo aborta el que esté en marcha. Ángulos fuera de ±2π, o un programa enviado durante
+una parada de protección, se rechazan con un mensaje de error (tipo 20), como haría el robot.
 
 Uso:
   python herramientas/robot_falso.py                         # puertos 30001 y 30003
   python herramientas/robot_falso.py --puerto-primaria 31001 --puerto-tiempo-real 31003
   python herramientas/robot_falso.py --trocear
+  python herramientas/robot_falso.py --quieto                # brazo parado en Home hasta recibir órdenes
 """
 from __future__ import annotations
 
 import argparse
 import math
+import queue
 import random
+import re
 import socket
 import struct
 import sys
@@ -36,23 +49,126 @@ LONGITUD_TIEMPO_REAL = 1220                                        # RealTime 5.
 
 
 class Brazo:
-    """Estado simulado del brazo: los ángulos dependen solo del tiempo."""
+    """Estado simulado del brazo.
 
-    def __init__(self) -> None:
+    Modo libre: los ángulos dependen solo del tiempo (el brazo "baila" solo).
+    Modo órdenes: el brazo está quieto y solo se mueve con movej, a velocidad articular v.
+    """
+
+    def __init__(self, quieto: bool = False) -> None:
         self.inicio = time.monotonic()
+        self._candado = threading.Lock()
+        self._libre = not quieto
+        self._q = list(POSTURA_BASE)
+        self._qd = [0.0] * 6
+        self._objetivos = []            # movej pendientes: [(q, v), ...]
+        self.programa_en_marcha = False
+        self.parada_proteccion = False
+        self._inicio_programa = 0.0
+        self._suscriptores = []         # una cola de mensajes (tipo 20) por cliente de la primaria
+        threading.Thread(target=self._mover, name="brazo", daemon=True).start()
 
     def tiempo(self) -> float:
         return time.monotonic() - self.inicio
 
     def q(self) -> list:
-        t = self.tiempo()
-        return [b + a * math.sin(2 * math.pi * t / p)
-                for b, a, p in zip(POSTURA_BASE, AMPLITUD, PERIODO_MOVIMIENTO)]
+        with self._candado:
+            if self._libre:
+                t = self.tiempo()
+                return [b + a * math.sin(2 * math.pi * t / p)
+                        for b, a, p in zip(POSTURA_BASE, AMPLITUD, PERIODO_MOVIMIENTO)]
+            return list(self._q)
 
     def qd(self) -> list:
-        t = self.tiempo()
-        return [a * 2 * math.pi / p * math.cos(2 * math.pi * t / p)
-                for a, p in zip(AMPLITUD, PERIODO_MOVIMIENTO)]
+        with self._candado:
+            if self._libre:
+                t = self.tiempo()
+                return [a * 2 * math.pi / p * math.cos(2 * math.pi * t / p)
+                        for a, p in zip(AMPLITUD, PERIODO_MOVIMIENTO)]
+            return list(self._qd)
+
+    # ------------------------------------------------------------------ mensajes del robot
+    def suscribir(self) -> "queue.Queue":
+        cola = queue.Queue()
+        with self._candado:
+            self._suscriptores.append(cola)
+        return cola
+
+    def _publicar(self, datos: bytes) -> None:
+        for cola in self._suscriptores:
+            cola.put(datos)
+
+    # ------------------------------------------------------------------ órdenes
+    def ejecutar(self, programa: str) -> None:
+        """Recibe un programa URScript (una línea o un bloque def ... end)."""
+        texto = programa.strip()
+        print(f"  orden recibida: {texto[:90]}{'…' if len(texto) > 90 else ''}", flush=True)
+        with self._candado:
+            if "falso_parada()" in texto:
+                self._parar_movimiento()
+                self.parada_proteccion = True
+                self._publicar(mensaje_error(3, "C153A1 Protective Stop (simulada en el robot falso)"))
+                return
+            if "falso_rearmar()" in texto:
+                self.parada_proteccion = False
+                return
+            if texto.startswith("stopj"):
+                self._parar_movimiento()
+                return
+            if self.parada_proteccion:
+                self._publicar(mensaje_error(3, "C210A0 No se puede iniciar el programa: parada de protección"))
+                return
+            objetivos = []
+            for m in re.finditer(r"movej\(\s*\[([^\]]*)\]\s*(?:,\s*a\s*=\s*([-\d.eE]+))?"
+                                 r"\s*(?:,\s*v\s*=\s*([-\d.eE]+))?", texto):
+                try:
+                    q = [float(x) for x in m.group(1).split(",")]
+                    v = float(m.group(3)) if m.group(3) else 1.05
+                except ValueError:
+                    q, v = [], 0
+                if len(q) != 6 or any(abs(x) > 2 * math.pi for x in q) or v <= 0:
+                    self._publicar(mensaje_excepcion(1, 1, "movej: ángulos o velocidad no válidos"))
+                    return
+                objetivos.append((q, v))
+            if not objetivos:
+                self._publicar(mensaje_excepcion(1, 1, f"compile_error: orden no reconocida '{texto[:40]}'"))
+                return
+            if self._libre:                      # primera orden: el brazo se queda donde está
+                t = self.tiempo()
+                self._q = [b + a * math.sin(2 * math.pi * t / p)
+                           for b, a, p in zip(POSTURA_BASE, AMPLITUD, PERIODO_MOVIMIENTO)]
+                self._libre = False
+            self._objetivos = objetivos          # un programa nuevo aborta el anterior
+            self.programa_en_marcha = True
+            self._inicio_programa = time.monotonic()
+
+    def _parar_movimiento(self) -> None:
+        self._objetivos = []
+        self._qd = [0.0] * 6
+        self.programa_en_marcha = False
+
+    def _mover(self) -> None:
+        """Hilo del brazo: avanza hacia el objetivo actual a 100 Hz (movimiento articular sincronizado)."""
+        dt = 0.01
+        while True:
+            time.sleep(dt)
+            with self._candado:
+                if not self._objetivos:
+                    if self.programa_en_marcha and time.monotonic() - self._inicio_programa > 0.3:
+                        self.programa_en_marcha = False
+                    continue
+                objetivo, v = self._objetivos[0]
+                dif = [o - q for o, q in zip(objetivo, self._q)]
+                mayor = max(abs(d) for d in dif)
+                paso = v * dt
+                if mayor <= paso:                 # llegado: siguiente objetivo
+                    self._q = list(objetivo)
+                    self._qd = [0.0] * 6
+                    self._objetivos.pop(0)
+                else:                             # todas las articulaciones llegan a la vez
+                    factor = paso / mayor
+                    self._q = [q + d * factor for q, d in zip(self._q, dif)]
+                    self._qd = [d * factor / dt for d in dif]
 
 
 # --------------------------------------------------------------------------- tramas primaria
@@ -76,12 +192,24 @@ def mensaje_texto(texto: str) -> bytes:
     return mensaje(20, struct.pack(">Qbb", int(time.time() * 1000), -2, 0) + texto.encode())
 
 
+def mensaje_error(nivel: int, texto: str) -> bytes:
+    """Robot Comm Message (tipo 20, subtipo 6): código, argumento, nivel, tipo de dato, dato, texto."""
+    return mensaje(20, struct.pack(">Qbb", int(time.time() * 1000), -2, 6)
+                   + struct.pack(">iiiII", 0, 0, nivel, 0, 0) + texto.encode())
+
+
+def mensaje_excepcion(linea: int, columna: int, texto: str) -> bytes:
+    """Runtime Exception Message (tipo 20, subtipo 10)."""
+    return mensaje(20, struct.pack(">Qbb", int(time.time() * 1000), -2, 10)
+                   + struct.pack(">ii", linea, columna) + texto.encode())
+
+
 def mensaje_estado(brazo: Brazo) -> bytes:
     q, qd = brazo.q(), brazo.qd()
     marca = int(brazo.tiempo() * 1e6)
     # 0 · Robot mode data: conectado, habilitado, encendido, sin paradas, sin programa, RUNNING (7)
-    modo = struct.pack(">Q???????BBdddB", marca, True, True, True, False, False, False, False,
-                       7, 0, 1.0, 1.0, 1.0, 0)
+    modo = struct.pack(">Q???????BBdddB", marca, True, True, True, False, brazo.parada_proteccion,
+                       brazo.programa_en_marcha, False, 7, 0, 1.0, 1.0, 1.0, 0)
     # 1 · Joint data: un bloque de 41 bytes por articulación
     articulaciones = b"".join(
         struct.pack(">dddffffB", q[j], q[j], qd[j], 0.1, 48.0, 30.0 + j, 35.0, 253) for j in range(6))
@@ -127,12 +255,42 @@ def enviar(conexion: socket.socket, datos: bytes, trocear: bool) -> None:
             time.sleep(0.0005)
 
 
+def leer_ordenes(conexion: socket.socket, brazo: Brazo) -> None:
+    """Hilo por cliente: lee texto URScript línea a línea (un bloque def ... end es un solo programa)."""
+    pendiente = b""
+    bloque = None
+    try:
+        while True:
+            datos = conexion.recv(4096)
+            if not datos:
+                return
+            pendiente += datos
+            while b"\n" in pendiente:
+                linea, pendiente = pendiente.split(b"\n", 1)
+                texto = linea.decode("utf-8", errors="replace").rstrip()
+                if bloque is not None:
+                    bloque.append(texto)
+                    if texto.strip() == "end":
+                        brazo.ejecutar("\n".join(bloque))
+                        bloque = None
+                elif texto.strip().startswith("def "):
+                    bloque = [texto]
+                elif texto.strip():
+                    brazo.ejecutar(texto)
+    except OSError:
+        return
+
+
 def atender_primaria(conexion: socket.socket, brazo: Brazo, trocear: bool) -> None:
+    mensajes = brazo.suscribir()
+    threading.Thread(target=leer_ordenes, args=(conexion, brazo), daemon=True).start()
     enviar(conexion, mensaje_version(), trocear)
     siguiente = time.monotonic()
     proximo_texto = siguiente + 15
     while True:
         enviar(conexion, mensaje_estado(brazo), trocear)
+        while not mensajes.empty():
+            enviar(conexion, mensajes.get(), trocear)
         if time.monotonic() >= proximo_texto:
             enviar(conexion, mensaje_texto("Mensaje de prueba del robot falso"), trocear)
             proximo_texto += 15
@@ -183,9 +341,10 @@ def main() -> None:
     parser.add_argument("--puerto-primaria", type=int, default=30001)
     parser.add_argument("--puerto-tiempo-real", type=int, default=30003)
     parser.add_argument("--trocear", action="store_true", help="enviar en trozos de tamaño aleatorio")
+    parser.add_argument("--quieto", action="store_true", help="brazo quieto en Home hasta recibir órdenes")
     args = parser.parse_args()
 
-    brazo = Brazo()
+    brazo = Brazo(quieto=args.quieto)
     for nombre, puerto, atender in (("primaria", args.puerto_primaria, atender_primaria),
                                     ("tiempo real", args.puerto_tiempo_real, atender_tiempo_real)):
         threading.Thread(target=servidor, args=(nombre, args.ip, puerto, atender, brazo, args.trocear),
