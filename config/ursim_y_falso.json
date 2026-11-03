@@ -1,0 +1,23 @@
+{
+    "_comentario": "Notable en casa: tu URSim (VM) y un robot falso en el mismo portátil (python herramientas/robot_falso.py --puerto-primaria 31001 --puerto-tiempo-real 31003). Para la defensa, cambia el segundo robot por el URSim de un compañero (su IP, puertos 30001 y 30003).",
+    "robots": [
+        {
+            "nombre": "ursim",
+            "ip": "10.164.57.193",
+            "puerto_primaria": 30001,
+            "puerto_tiempo_real": 30003,
+            "pose": [0, 0, 0, 0, 0, 0]
+        },
+        {
+            "nombre": "falso",
+            "ip": "127.0.0.1",
+            "puerto_primaria": 31001,
+            "puerto_tiempo_real": 31003,
+            "pose": [0, 0.8, 0, 0, 0, 3.14159]
+        }
+    ],
+    "convenio_angulos": {
+        "signo": [1, 1, 1, 1, 1, 1],
+        "desfase_grados": [0, 0, 0, 0, 0, 0]
+    }
+}

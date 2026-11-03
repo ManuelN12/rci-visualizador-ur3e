@@ -30,6 +30,8 @@ class Visor:
         self.convenio = convenio
         self._ur = UR3eRG2()           # abre la ventana y crea el robot 0 en el origen
         self._robot_inicial_usado = False
+        self._colores = {}             # robot_id -> [(link, color original)] para poder restaurarlo
+        self._marcados = set()         # robots pintados como "sin datos"
 
     def anadir_robot(self, pose: List[float]) -> int:
         """Devuelve el identificador del robot simulado que seguirá a un robot real.
@@ -49,6 +51,21 @@ class Visor:
         """Coloca el robot simulado en los ángulos q_ur (rad) leídos del robot real."""
         q_modelo = self.convenio.aplicar(q_ur)
         self._ur.move_robot(robot_id, list(q_modelo))   # copia: move_robot la modifica
+
+    def marcar_sin_datos(self, robot_id: int, sin_datos: bool) -> None:
+        """Pinta de rojo un robot que no recibe datos, o le devuelve su color original."""
+        if sin_datos == (robot_id in self._marcados):
+            return                                    # ya está como se pide: no repetir llamadas
+        import pybullet as p
+        if robot_id not in self._colores:
+            # getVisualShapeData: una entrada por pieza; [1] = índice del link, [7] = color RGBA
+            self._colores[robot_id] = [(d[1], d[7]) for d in p.getVisualShapeData(robot_id)]
+        for link, color in self._colores[robot_id]:
+            p.changeVisualShape(robot_id, link, rgbaColor=[0.9, 0.15, 0.15, 1] if sin_datos else color)
+        if sin_datos:
+            self._marcados.add(robot_id)
+        else:
+            self._marcados.discard(robot_id)
 
     def deslizadores(self) -> dict:
         """Valores de los deslizadores de la ventana (claves ' j0' a ' j11')."""
