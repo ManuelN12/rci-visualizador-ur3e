@@ -13,7 +13,7 @@ los mensajes binarios que emite y reproduce su configuración articular en el si
 |---|---|---|
 | Aprobado (5) | `primaria.py` (30001) y `tiempo_real.py` (30003), con búfer y delimitación por longitud | ✅ Validado con URSim 5.25.2 (hitos A0–A5, B1–B4 y reinicio de URSim). Resultados en `medidas/` |
 | Notable (7) | Varios robots en la misma ventana, configurados por fichero, uno por hilo | ✅ `varios_robots.py` probado con URSim + robot falso (desconexión de uno sin afectar al otro). Pendiente: repetir con el URSim de un compañero |
-| Sobresaliente (10) | Envío de órdenes URScript y mini-aplicación «Enseñar y reproducir» | ◐ `ensenar_reproducir.py` probado con el robot falso. Pendiente: URSim y UR3e real con el profesor |
+| Sobresaliente (10) | Envío de órdenes URScript y mini-aplicación «Enseñar y reproducir» | ✅ `ensenar_reproducir.py` validado con URSim (4 puntos, error provocado apagando el robot). Pendiente: UR3e real con el profesor |
 
 ## Estructura
 
@@ -107,7 +107,9 @@ y se pinta de rojo, y los demás siguen funcionando. Cada 2 s se muestra una tab
 ### Enseñar y reproducir (sobresaliente)
 
 Requisitos en PolyScope: robot encendido (ON → START, estado Normal), *Settings → System → Remote Control* habilitado
-y el icono de arriba a la derecha en **Remote**.
+y el icono de arriba a la derecha en **Remote**. En Remote la pestaña *Move* está desactivada: para enseñar puntos
+moviendo el robot desde PolyScope, pasar a **Local**, guardar los puntos con `punto` y volver a **Remote** antes de
+`ejecutar` (los puntos de `deslizadores` se pueden enseñar en Remote).
 
 ```bash
 python ensenar_reproducir.py                       # robot por defecto de config/robots.json

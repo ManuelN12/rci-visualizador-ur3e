@@ -39,6 +39,7 @@ MENSAJE_POPUP = 2
 MENSAJE_VERSION = 3
 MENSAJE_MODO_SEGURIDAD = 5
 MENSAJE_CODIGO_ERROR = 6       # Robot Comm Message
+MENSAJE_CLAVE = 7              # Key Message: avisos con título (programa iniciado, detenido...)
 MENSAJE_EXCEPCION_PROGRAMA = 10  # Runtime Exception Message
 
 # Robot mode data: tras la cabecera de 5 bytes
@@ -156,7 +157,7 @@ class MensajeRobot:
         return {
             MENSAJE_TEXTO: "texto", MENSAJE_POPUP: "ventana emergente", MENSAJE_VERSION: "versión",
             MENSAJE_MODO_SEGURIDAD: "modo de seguridad", MENSAJE_CODIGO_ERROR: "código de error",
-            MENSAJE_EXCEPCION_PROGRAMA: "excepción de programa",
+            MENSAJE_EXCEPCION_PROGRAMA: "excepción de programa", MENSAJE_CLAVE: "aviso",
         }.get(self.subtipo, f"subtipo {self.subtipo}")
 
 
@@ -250,6 +251,13 @@ def decodificar_mensaje_robot(mensaje: bytes) -> MensajeRobot:
         linea, columna = struct.unpack_from(">ii", mensaje, cuerpo)
         texto = _texto(mensaje[cuerpo + 8:])
         return MensajeRobot(subtipo, f"línea {linea}, columna {columna}: {texto}", es_error=True)
+
+    if subtipo == MENSAJE_CLAVE:
+        # int32 código, int32 argumento, uint8 tamaño del título, título, texto
+        codigo, argumento, n = struct.unpack_from(">iiB", mensaje, cuerpo)
+        titulo = _texto(mensaje[cuerpo + 9:cuerpo + 9 + n])
+        texto = _texto(mensaje[cuerpo + 9 + n:])
+        return MensajeRobot(subtipo, f"{titulo} {texto}".strip())
 
     if subtipo == MENSAJE_TEXTO:
         return MensajeRobot(subtipo, _texto(mensaje[cuerpo:]))
