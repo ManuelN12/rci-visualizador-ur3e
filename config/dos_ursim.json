@@ -1,0 +1,23 @@
+{
+    "_comentario": "Notable con dos URSim: el mío y el de un compañero. Cambia la IP del compañero por la de su VM (ip a, línea inet de eth0).",
+    "robots": [
+        {
+            "nombre": "manuel",
+            "ip": "10.172.18.62",
+            "puerto_primaria": 30001,
+            "puerto_tiempo_real": 30003,
+            "pose": [0, 0, 0, 0, 0, 0]
+        },
+        {
+            "nombre": "companero",
+            "ip": "10.172.18.59",
+            "puerto_primaria": 30001,
+            "puerto_tiempo_real": 30003,
+            "pose": [0, 0.8, 0, 0, 0, 3.14159]
+        }
+    ],
+    "convenio_angulos": {
+        "signo": [1, 1, 1, 1, 1, 1],
+        "desfase_grados": [0, 0, 0, 0, 0, 0]
+    }
+}
