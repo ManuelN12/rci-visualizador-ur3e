@@ -1,0 +1,23 @@
+{
+    "_comentario": "Notable con dos UR3e reales del laboratorio (red 10.172.21.x). Pon las IP de los dos robots que asigne el profesor: columna izquierda .204 y .203, columna derecha .206 y .205.",
+    "robots": [
+        {
+            "nombre": "ur3e_a",
+            "ip": "10.172.21.203",
+            "puerto_primaria": 30001,
+            "puerto_tiempo_real": 30003,
+            "pose": [0, 0, 0, 0, 0, 0]
+        },
+        {
+            "nombre": "ur3e_b",
+            "ip": "10.172.21.204",
+            "puerto_primaria": 30001,
+            "puerto_tiempo_real": 30003,
+            "pose": [0, 0.8, 0, 0, 0, 3.14159]
+        }
+    ],
+    "convenio_angulos": {
+        "signo": [1, 1, 1, 1, 1, 1],
+        "desfase_grados": [0, 0, 0, 0, 0, 0]
+    }
+}

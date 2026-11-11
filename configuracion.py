@@ -6,12 +6,21 @@ Así el mismo programa sirve para URSim en el aula y para un UR3e real en el lab
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass, field
 from math import radians
 from pathlib import Path
 from typing import List, Optional
 
-FICHERO_POR_DEFECTO = Path(__file__).parent / "config" / "robots.json"
+# Carpeta del programa: la del .py, o la del .exe si se ejecuta empaquetado con PyInstaller.
+# Dentro del .exe, __file__ apunta a una carpeta interna; config/ y secuencias/ van junto al .exe
+# para poder cambiar la IP sin volver a construir el ejecutable.
+if getattr(sys, "frozen", False):
+    CARPETA_BASE = Path(sys.executable).parent
+else:
+    CARPETA_BASE = Path(__file__).parent
+
+FICHERO_POR_DEFECTO = CARPETA_BASE / "config" / "robots.json"
 
 
 @dataclass

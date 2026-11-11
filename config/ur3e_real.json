@@ -1,0 +1,16 @@
+{
+    "_comentario": "UR3e real del laboratorio de robótica (red 10.172.21.x). Cambia la IP por la del robot asignado: columna izquierda .204 y .203, columna derecha .206 y .205.",
+    "robots": [
+        {
+            "nombre": "ur3e_real",
+            "ip": "10.172.21.203",
+            "puerto_primaria": 30001,
+            "puerto_tiempo_real": 30003,
+            "pose": [0, 0, 0, 0, 0, 0]
+        }
+    ],
+    "convenio_angulos": {
+        "signo": [1, 1, 1, 1, 1, 1],
+        "desfase_grados": [0, 0, 0, 0, 0, 0]
+    }
+}

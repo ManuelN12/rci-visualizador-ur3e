@@ -47,7 +47,7 @@ ESPERA_ARRANQUE = 2.0     # s para que isProgramRunning pase a verdadero tras en
 MAX_MOVIMIENTO = 120.0    # s: un movimiento que dure más se considera atascado
 FRESCURA = 1.0            # s: antigüedad máxima del estado para fiarse de él
 FPS = 30
-CARPETA_SECUENCIAS = Path(__file__).parent / "secuencias"
+CARPETA_SECUENCIAS = configuracion.CARPETA_BASE / "secuencias"   # junto al .py o junto al .exe
 ROBOT_RUNNING = 7
 
 AYUDA = """

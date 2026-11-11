@@ -24,6 +24,8 @@ los mensajes binarios que emite y reproduce su configuración articular en el si
 ├── receptor.py            Hilo receptor de un robot (último estado protegido con Lock)
 ├── ensenar_reproducir.py  Bloque D · sobresaliente: enseñar, previsualizar, ejecutar y supervisar
 ├── consola_ur3e.bat       Doble clic: consola con el entorno conda ur3e (PyBullet) en esta carpeta
+├── lanzador.py            Punto de entrada del ejecutable: menú y elección del programa
+├── construir_exe.bat      Doble clic: construye el ejecutable para el laboratorio (PyInstaller)
 ├── ur_protocolo.py        Decodificación: búfer, mensajes, subpaquetes, tiempo real (sin red)
 ├── ur_conexion.py         Conexión TCP: búfer, watchdog de silencio y reconexión automática
 ├── visor.py               Envoltorio del visualizador PyBullet (convenio de ángulos, copias de listas)
@@ -127,6 +129,28 @@ robot (tipo 20, subtipos 6 o 10) o una parada de protección detienen la secuenc
 
 Para probarlo sin URSim: `python herramientas/robot_falso.py --quieto` acepta `movej`, `stopj` y bloques `def … end`,
 y para provocar un error, `falso_parada()` / `falso_rearmar()` (solo en el robot falso).
+
+### Ejecutable para el laboratorio (sin instalar nada)
+
+En el PC del laboratorio no se instala Python. Se lleva un ejecutable construido con PyInstaller, que incluye
+el intérprete, PyBullet, el visualizador `UR3e_rg2` y este código:
+
+1. En el portátil (con el entorno conda `ur3e`): doble clic en `construir_exe.bat`.
+   Genera `dist\visualizador_ur3e\` y `dist\visualizador_ur3e.zip`.
+2. En el laboratorio: descomprimir el zip, poner la IP del robot en `config\ur3e_real.json` y doble clic en
+   `visualizador_ur3e.exe` (menú), o desde una consola:
+
+```bash
+visualizador_ur3e primaria --config config\ur3e_real.json --modo angulos
+visualizador_ur3e tiempo_real --config config\ur3e_real.json
+visualizador_ur3e varios --config config\dos_ursim.json
+visualizador_ur3e ensenar --config config\ur3e_real.json
+visualizador_ur3e falso --quieto
+```
+
+`lanzador.py` es el punto de entrada: elige el programa y le pasa los argumentos. `config\` y `secuencias\` van
+**junto al .exe** (`configuracion.CARPETA_BASE`), así que la IP se cambia sin reconstruir el ejecutable.
+Ver `docs/CHULETA_LABORATORIO.md`.
 
 ### Probar en casa sin URSim
 

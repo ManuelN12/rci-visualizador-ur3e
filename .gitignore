@@ -15,3 +15,8 @@ desktop.ini
 
 # El visualizador se instala desde el .whl del aula virtual: no se sube
 *.whl
+
+# Ejecutable (construir_exe.bat): se genera en cada PC, no se sube
+build/
+dist/
+*.spec
