@@ -20,6 +20,9 @@ cargada: así se comprueba que el búfer del cliente corta bien los mensajes.
   stopj(a)                              detiene el movimiento
   falso_parada()                        SOLO PRUEBAS: simula una parada de protección
   falso_rearmar()                       SOLO PRUEBAS: la quita (como "desbloquear" en PolyScope)
+  falso_local() / falso_remoto()        SOLO PRUEBAS: pasa el robot a Local / Remote
+Como el UR3e real, el permiso de cada conexión se fija al conectar: una conexión abierta con el robot
+en Local es de solo lectura (sus órdenes se rechazan con el error C210A0) aunque luego se pase a Remote.
 Un programa nuevo aborta el que esté en marcha. Ángulos fuera de ±2π, o un programa enviado durante
 una parada de protección, se rechazan con un mensaje de error (tipo 20), como haría el robot.
 
@@ -28,6 +31,7 @@ Uso:
   python herramientas/robot_falso.py --puerto-primaria 31001 --puerto-tiempo-real 31003
   python herramientas/robot_falso.py --trocear
   python herramientas/robot_falso.py --quieto                # brazo parado en Home hasta recibir órdenes
+  python herramientas/robot_falso.py --quieto --local        # empieza en Local (prueba del error C210)
 """
 from __future__ import annotations
 
@@ -55,7 +59,7 @@ class Brazo:
     Modo órdenes: el brazo está quieto y solo se mueve con movej, a velocidad articular v.
     """
 
-    def __init__(self, quieto: bool = False) -> None:
+    def __init__(self, quieto: bool = False, remoto: bool = True) -> None:
         self.inicio = time.monotonic()
         self._candado = threading.Lock()
         self._libre = not quieto
@@ -64,6 +68,7 @@ class Brazo:
         self._objetivos = []            # movej pendientes: [(q, v), ...]
         self.programa_en_marcha = False
         self.parada_proteccion = False
+        self.remoto = remoto            # Remote: las conexiones abiertas ahora pueden dar órdenes
         self._inicio_programa = 0.0
         self._suscriptores = []         # una cola de mensajes (tipo 20) por cliente de la primaria
         threading.Thread(target=self._mover, name="brazo", daemon=True).start()
@@ -94,16 +99,32 @@ class Brazo:
             self._suscriptores.append(cola)
         return cola
 
+    def desuscribir(self, cola: "queue.Queue") -> None:
+        with self._candado:
+            if cola in self._suscriptores:
+                self._suscriptores.remove(cola)
+
     def _publicar(self, datos: bytes) -> None:
         for cola in self._suscriptores:
             cola.put(datos)
 
     # ------------------------------------------------------------------ órdenes
-    def ejecutar(self, programa: str) -> None:
-        """Recibe un programa URScript (una línea o un bloque def ... end)."""
+    def ejecutar(self, programa: str, escritura: bool = True) -> None:
+        """Recibe un programa URScript (una línea o un bloque def ... end).
+
+        escritura: si la conexión por la que llega se abrió con el robot en Remote.
+        """
         texto = programa.strip()
         print(f"  orden recibida: {texto[:90]}{'…' if len(texto) > 90 else ''}", flush=True)
         with self._candado:
+            if "falso_remoto()" in texto or "falso_local()" in texto:
+                self.remoto = "falso_remoto()" in texto
+                print(f"  robot en {'Remote' if self.remoto else 'Local'}", flush=True)
+                return
+            if not escritura:
+                self._publicar(mensaje_error(1, "", codigo=210, argumento=0))   # como el UR3e real
+                print("  rechazada: conexión abierta en Local (solo lectura) → C210A0", flush=True)
+                return
             if "falso_parada()" in texto:
                 self._parar_movimiento()
                 self.parada_proteccion = True
@@ -192,10 +213,10 @@ def mensaje_texto(texto: str) -> bytes:
     return mensaje(20, struct.pack(">Qbb", int(time.time() * 1000), -2, 0) + texto.encode())
 
 
-def mensaje_error(nivel: int, texto: str) -> bytes:
+def mensaje_error(nivel: int, texto: str, codigo: int = 0, argumento: int = 0) -> bytes:
     """Robot Comm Message (tipo 20, subtipo 6): código, argumento, nivel, tipo de dato, dato, texto."""
     return mensaje(20, struct.pack(">Qbb", int(time.time() * 1000), -2, 6)
-                   + struct.pack(">iiiII", 0, 0, nivel, 0, 0) + texto.encode())
+                   + struct.pack(">iiiII", codigo, argumento, nivel, 0, 0) + texto.encode())
 
 
 def mensaje_excepcion(linea: int, columna: int, texto: str) -> bytes:
@@ -255,7 +276,7 @@ def enviar(conexion: socket.socket, datos: bytes, trocear: bool) -> None:
             time.sleep(0.0005)
 
 
-def leer_ordenes(conexion: socket.socket, brazo: Brazo) -> None:
+def leer_ordenes(conexion: socket.socket, brazo: Brazo, escritura: bool = True) -> None:
     """Hilo por cliente: lee texto URScript línea a línea (un bloque def ... end es un solo programa)."""
     pendiente = b""
     bloque = None
@@ -271,19 +292,27 @@ def leer_ordenes(conexion: socket.socket, brazo: Brazo) -> None:
                 if bloque is not None:
                     bloque.append(texto)
                     if texto.strip() == "end":
-                        brazo.ejecutar("\n".join(bloque))
+                        brazo.ejecutar("\n".join(bloque), escritura)
                         bloque = None
                 elif texto.strip().startswith("def "):
                     bloque = [texto]
                 elif texto.strip():
-                    brazo.ejecutar(texto)
+                    brazo.ejecutar(texto, escritura)
     except OSError:
         return
 
 
 def atender_primaria(conexion: socket.socket, brazo: Brazo, trocear: bool) -> None:
     mensajes = brazo.suscribir()
-    threading.Thread(target=leer_ordenes, args=(conexion, brazo), daemon=True).start()
+    escritura = brazo.remoto       # el permiso se fija al conectar, como en el robot real
+    threading.Thread(target=leer_ordenes, args=(conexion, brazo, escritura), daemon=True).start()
+    try:
+        _emitir_primaria(conexion, brazo, mensajes, trocear)
+    finally:
+        brazo.desuscribir(mensajes)
+
+
+def _emitir_primaria(conexion: socket.socket, brazo: Brazo, mensajes: "queue.Queue", trocear: bool) -> None:
     enviar(conexion, mensaje_version(), trocear)
     siguiente = time.monotonic()
     proximo_texto = siguiente + 15
@@ -342,9 +371,10 @@ def main() -> None:
     parser.add_argument("--puerto-tiempo-real", type=int, default=30003)
     parser.add_argument("--trocear", action="store_true", help="enviar en trozos de tamaño aleatorio")
     parser.add_argument("--quieto", action="store_true", help="brazo quieto en Home hasta recibir órdenes")
+    parser.add_argument("--local", action="store_true", help="empezar en Local (las conexiones serán de solo lectura)")
     args = parser.parse_args()
 
-    brazo = Brazo(quieto=args.quieto)
+    brazo = Brazo(quieto=args.quieto, remoto=not args.local)
     for nombre, puerto, atender in (("primaria", args.puerto_primaria, atender_primaria),
                                     ("tiempo real", args.puerto_tiempo_real, atender_tiempo_real)):
         threading.Thread(target=servidor, args=(nombre, args.ip, puerto, atender, brazo, args.trocear),

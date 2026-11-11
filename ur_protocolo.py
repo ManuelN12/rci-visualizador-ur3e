@@ -151,6 +151,7 @@ class MensajeRobot:
     subtipo: int
     texto: str = ""
     es_error: bool = False
+    codigo: Optional[int] = None     # subtipo 6: número de error (C210 → 210)
 
     @property
     def nombre(self) -> str:
@@ -245,7 +246,8 @@ def decodificar_mensaje_robot(mensaje: bytes) -> MensajeRobot:
         texto = _texto(mensaje[cuerpo + 20:])
         # Niveles: 1 INFO, 2 WARNING, 3 VIOLATION, 4 FAULT (128+ son de desarrollo)
         nivel_base = nivel % 128
-        return MensajeRobot(subtipo, f"C{codigo}A{argumento} (nivel {nivel}) {texto}", es_error=nivel_base >= 3)
+        return MensajeRobot(subtipo, f"C{codigo}A{argumento} (nivel {nivel}) {texto}", es_error=nivel_base >= 3,
+                            codigo=codigo)
 
     if subtipo == MENSAJE_EXCEPCION_PROGRAMA:
         linea, columna = struct.unpack_from(">ii", mensaje, cuerpo)

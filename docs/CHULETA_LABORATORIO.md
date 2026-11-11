@@ -82,6 +82,9 @@ python ensenar_reproducir.py --config config/ur3e_real.json
 3. Con el profesor junto a la seta de emergencia: `ejecutar`.
 4. Si el profesor lo autoriza: probar `pausa` / `seguir`.
 
+Se puede enseñar en **Local** y ejecutar en **Remote** sin reiniciar el programa: cada orden sale por una conexión
+nueva. Si al ejecutar sale **C210** (*socket is read-only*), el robot sigue en Local: pasarlo a Remote y escribir `seguir`.
+
 El programa ya limita `v = 0,3 rad/s` y `a = 0,5 rad/s²`, comprueba que los ángulos están en radianes (±2π) y no envía
 nada si el robot no está en `RUNNING`, sin paradas y sin programa en marcha.
 

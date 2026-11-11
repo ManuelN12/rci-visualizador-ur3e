@@ -122,6 +122,37 @@ class ConexionUR:
             return []
 
     # ------------------------------------------------------------------ escritura
+    def enviar_orden(self, texto: str, espera_lectura: float = 0.3) -> bool:
+        """Envía URScript por una conexión NUEVA, abierta justo ahora, y la cierra.
+
+        El controlador decide si una conexión puede dar órdenes (robot en Remote) o solo leer
+        (robot en Local) en el momento del connect(), y lo mantiene mientras dure la conexión.
+        Si la conexión de lectura se abrió con el robot en Local (por ejemplo, para enseñar puntos
+        con la consola) y después se pasa a Remote, esa conexión sigue siendo de solo lectura:
+        el robot rechaza las órdenes con el error C210A0. Abriendo una conexión por orden, el
+        permiso es siempre el del modo en que está el robot al enviarla.
+        """
+        if not texto.endswith("\n"):
+            texto += "\n"   # sin salto de línea el controlador no ejecuta nada
+        try:
+            with socket.create_connection((self.ip, self.puerto), timeout=self.timeout_conexion) as sock:
+                sock.sendall(texto.encode("utf-8"))
+                # El robot envía su versión y su estado a toda conexión nueva. Se leen y se descartan
+                # unas décimas de segundo antes de cerrar: cerrar con datos sin leer haría que el SO
+                # cortara la conexión con un RST en vez de un cierre normal (FIN).
+                sock.settimeout(0.05)
+                fin = time.monotonic() + espera_lectura
+                while time.monotonic() < fin:
+                    try:
+                        if not sock.recv(65536):
+                            break
+                    except socket.timeout:
+                        pass
+            return True
+        except OSError as exc:
+            self._registro(self.nombre, f"no se pudo enviar la orden ({exc})")
+            return False
+
     def enviar_texto(self, texto: str) -> bool:
         """Envía una línea de texto (URScript). Devuelve False si no hay conexión."""
         if self.sock is None:

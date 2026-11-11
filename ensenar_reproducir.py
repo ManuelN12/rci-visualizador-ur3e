@@ -49,6 +49,7 @@ FRESCURA = 1.0            # s: antigüedad máxima del estado para fiarse de él
 FPS = 30
 CARPETA_SECUENCIAS = configuracion.CARPETA_BASE / "secuencias"   # junto al .py o junto al .exe
 ROBOT_RUNNING = 7
+ERROR_SOLO_LECTURA = 210   # C210: "Socket is read-only when the robot is in local control"
 
 AYUDA = """
 Órdenes (escribe y pulsa Enter):
@@ -133,7 +134,7 @@ class Ejecutor:
 
     def pausar(self, motivo: str, parar_robot: bool = False) -> None:
         if parar_robot:
-            self.receptor.conexion.enviar_texto("stopj(2.0)")
+            self.receptor.conexion.enviar_orden("stopj(2.0)")
         self.motivo = motivo
         self._cambiar("PAUSADO")
         log(f"⏸ SECUENCIA DETENIDA en el punto {self.indice + 1}/{len(self.puntos)}: {motivo}")
@@ -148,7 +149,7 @@ class Ejecutor:
 
     def cancelar(self) -> None:
         if self.activo:
-            self.receptor.conexion.enviar_texto("stopj(2.0)")
+            self.receptor.conexion.enviar_orden("stopj(2.0)")
         if self.estado != "INACTIVO":
             log("■ Secuencia cancelada.")
         self._cambiar("INACTIVO")
@@ -176,7 +177,7 @@ class Ejecutor:
         if problema:
             self.pausar(problema)
             return
-        if not self.receptor.conexion.enviar_texto(orden_movej(objetivo)):
+        if not self.receptor.conexion.enviar_orden(orden_movej(objetivo)):
             self.pausar("no se pudo enviar la orden")
             return
         log(f"→ punto {self.indice + 1}/{len(self.puntos)} enviado: movej a ({grados(objetivo)}) °")
@@ -188,6 +189,10 @@ class Ejecutor:
             return
         # Supervisión: errores del robot y paradas
         for m in lectura.mensajes_robot:
+            if m.codigo == ERROR_SOLO_LECTURA:
+                self.pausar("el robot ha rechazado la orden (C210: conexión de solo lectura). Pon el robot "
+                            "en Remote y escribe «seguir»")
+                return
             if m.es_error or m.subtipo == ur.MENSAJE_EXCEPCION_PROGRAMA:
                 self.pausar(f"error del robot · {m.nombre}: {m.texto}")
                 return

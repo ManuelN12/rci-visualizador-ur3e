@@ -122,10 +122,16 @@ python ensenar_reproducir.py                       # robot por defecto de config
 `lista`, `borrar N`, `vaciar`, `ver` (previsualizar con el robot fantasma azul), `ejecutar`, `pausa`, `seguir`,
 `cancelar`, `guardar NOMBRE`, `cargar NOMBRE`, `estado`, `ayuda`, `salir`.
 
-Cada punto se envía como `movej(q, a=0.5, v=0.3)` por el socket del puerto 30001 y no se envía el siguiente hasta que
+Cada punto se envía como `movej(q, a=0.5, v=0.3)` por una conexión **nueva** al puerto 30001 y no se envía el siguiente hasta que
 `isProgramRunning` ha pasado a verdadero y luego a falso y `q_actual` está a menos de 0,01 rad del objetivo. Un error del
 robot (tipo 20, subtipos 6 o 10) o una parada de protección detienen la secuencia. Las secuencias se guardan en
 `secuencias/NOMBRE.json` (radianes).
+
+**Por qué una conexión nueva por orden:** el controlador fija el permiso de cada conexión al conectar. Una conexión
+abierta con el robot en Local es de solo lectura aunque después se pase a Remote, y el robot rechaza sus órdenes con
+el error **C210A0** (*Socket is read-only when the robot is in local control*). Se comprobó en el UR3e real del
+laboratorio: los puntos se enseñan en Local y se ejecutan en Remote. Las lecturas siguen por la conexión permanente;
+cada `movej` o `stopj` abre su propia conexión, envía la orden y la cierra. Si llega un C210, la secuencia se detiene.
 
 Para probarlo sin URSim: `python herramientas/robot_falso.py --quieto` acepta `movej`, `stopj` y bloques `def … end`,
 y para provocar un error, `falso_parada()` / `falso_rearmar()` (solo en el robot falso).
