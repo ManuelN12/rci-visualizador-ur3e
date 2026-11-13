@@ -8,7 +8,8 @@ supervisar su ejecución.
                   También se puede definir un punto con los deslizadores de PyBullet («deslizadores»).
   2. VER          «ver» reproduce la secuencia en PyBullet con un robot «fantasma» (azul, translúcido)
                   antes de mover el robot de verdad.
-  3. EJECUTAR     «ejecutar» envía un movej por punto (URScript, texto + \\n, por el mismo socket del 30001)
+  3. EJECUTAR     «ejecutar» envía un movej por punto (URScript, texto + \\n, por una conexión nueva al 30001,
+                  ver ConexionUR.enviar_orden: así funciona aunque el programa arrancara con el robot en Local)
                   y NO envía el siguiente hasta comprobar con el estado que publica el robot que el anterior
                   ha terminado: isProgramRunning pasa a verdadero (orden aceptada), después a falso (terminada),
                   y q_actual queda a menos de 0,01 rad del objetivo en cada articulación.

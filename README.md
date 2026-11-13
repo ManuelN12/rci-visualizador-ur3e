@@ -1,8 +1,9 @@
 # Visualizador de un UR3e por TCP/IP
 
-**Asignatura:** Redes de Comunicación Industriales · Máster en Electrónica Industrial · Universidad de Deusto
+**Asignatura:** Redes de Comunicación Industriales · Máster en Automatización, Electrónica y Control Industrial · Universidad de Deusto
 **Alumno:** Manuel Narváez
-**Curso:** 2026–2027
+**Curso:** 2026–2027  
+**Repositorio:** https://github.com/ManuelN12/rci-visualizador-ur3e
 
 Programa en Python que se conecta por TCP/IP a un robot UR3e (real o simulado con URSim), decodifica byte a byte
 los mensajes binarios que emite y reproduce su configuración articular en el simulador PyBullet.
